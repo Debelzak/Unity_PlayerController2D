@@ -3,35 +3,32 @@ using System.Collections;
 
 [RequireComponent (typeof (Controller2D))]
 public class Player : MonoBehaviour {
-
 	public float maxJumpHeight = 4;
 	public float minJumpHeight = 1;
 	public float timeToJumpApex = .4f;
-	float accelerationTimeAirborne = .2f;
-	float accelerationTimeGrounded = .1f;
+	//float accelerationTimeAirborne = .2f;
+	//float accelerationTimeGrounded = .1f;
 	float moveSpeed = 6;
-
-	public Vector2 wallJumpClimb;
-	public Vector2 wallJumpOff;
-	public Vector2 wallLeap;
-
-	public float wallSlideSpeedMax = 3;
-	public float wallStickTime = .25f;
-	float timeToWallUnstick;
+	public bool enableWallSlide;
+	public bool enableDoubleJump;
+	public float wallSlideSpeed = 0.5f;
+	public float wallJumpImpulse = 1.0f;
+	bool isWallSliding;
 
 	float gravity;
 	float maxJumpVelocity;
 	float minJumpVelocity;
-	Vector3 velocity;
-	float velocityXSmoothing;
+	[SerializeField]Vector3 velocity;
+	bool isGrounded;
+	bool canJump;
+	bool canDoubleJump;
 
 	Controller2D controller;
 
 	Vector2 directionalInput;
-	bool wallSliding;
-	int wallDirX;
 
 	void Start() {
+		Physics2D.gravity = new Vector2(0, -28);
 		controller = GetComponent<Controller2D> ();
 
 		gravity = -(2 * maxJumpHeight) / Mathf.Pow (timeToJumpApex, 2);
@@ -40,8 +37,9 @@ public class Player : MonoBehaviour {
 	}
 
 	void Update() {
-		CalculateVelocity ();
-		//HandleWallSliding ();
+		CalculateVelocity();
+		CheckGround();
+		HandleWallSliding();
 
 		controller.Move (velocity * Time.deltaTime, directionalInput);
 
@@ -55,69 +53,66 @@ public class Player : MonoBehaviour {
 	}
 
 	public void OnJumpInputDown() {
-		if(directionalInput.y == -1) {
+		if(isWallSliding) {
+			velocity.y = maxJumpVelocity;
+			velocity.x += wallJumpImpulse * -directionalInput.x;
+		}
+
+		if(directionalInput.y == -1 && controller.collisions.onOneWayPlatform) {
 			return;
 		}
 
-		if (wallSliding) {
-			if (wallDirX == directionalInput.x) {
-				velocity.x = -wallDirX * wallJumpClimb.x;
-				velocity.y = wallJumpClimb.y;
-			}
-			else if (directionalInput.x == 0) {
-				velocity.x = -wallDirX * wallJumpOff.x;
-				velocity.y = wallJumpOff.y;
-			}
-			else {
-				velocity.x = -wallDirX * wallLeap.x;
-				velocity.y = wallLeap.y;
-			}
+		if (canJump) {
+			canJump = false;
+			Jump();
 		}
-		if (controller.collisions.below) {
-			velocity.y += maxJumpVelocity;
+
+		if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
+			canDoubleJump = false;
+			Jump();
 		}
 	}
 
-	public void OnJumpInputUp() {
+	public void OnJumpInputUp() 
+	{
 		if (velocity.y > minJumpVelocity) {
 			velocity.y = minJumpVelocity;
 		}
 	}
-		
+
+	void CheckGround()
+	{
+		Vector2 point = new Vector2 (controller.targetCollider.bounds.min.x + (controller.targetCollider.size.x / 2), controller.targetCollider.bounds.min.y);
+		isGrounded = (controller.collisions.below || Physics2D.OverlapCircle(point, 0.4f, controller.collisionMask)) ? true : false;
+
+		canJump = (isGrounded) ? true : false;
+
+		if(isGrounded && velocity.y <= 0) {
+			canDoubleJump = true;
+		}
+	}
 
 	void HandleWallSliding() {
-		wallDirX = (controller.collisions.left) ? -1 : 1;
-		wallSliding = false;
-		if ((controller.collisions.left || controller.collisions.right) && !controller.collisions.below && velocity.y < 0) {
-			wallSliding = true;
-
-			if (velocity.y < -wallSlideSpeedMax) {
-				velocity.y = -wallSlideSpeedMax;
-			}
-
-			if (timeToWallUnstick > 0) {
-				velocityXSmoothing = 0;
-				velocity.x = 0;
-
-				if (directionalInput.x != wallDirX && directionalInput.x != 0) {
-					timeToWallUnstick -= Time.deltaTime;
+		if(enableWallSlide) {
+			isWallSliding = false;
+			bool canWallSlideNow = ( (controller.collisions.left || controller.collisions.right ) && controller.collisions.slopeAngle == 0) ? true : false;
+			if(canWallSlideNow && !isGrounded && velocity.y < 0) {
+				isWallSliding = true;
+				if(velocity.y != -wallSlideSpeed) {
+					velocity.y = -wallSlideSpeed;
 				}
-				else {
-					timeToWallUnstick = wallStickTime;
-				}
+				velocity.y = -wallSlideSpeed;
 			}
-			else {
-				timeToWallUnstick = wallStickTime;
-			}
-
 		}
-
 	}
 
 	void CalculateVelocity() {
-		float targetVelocityX = directionalInput.x * moveSpeed;
-		//velocity.x = Mathf.SmoothDamp (velocity.x, targetVelocityX, ref velocityXSmoothing, (controller.collisions.below)?accelerationTimeGrounded:accelerationTimeAirborne);
-		velocity.x = targetVelocityX;
+		velocity.x = 0;
+		velocity.x += directionalInput.x * moveSpeed;
 		velocity.y += gravity * Time.deltaTime;
+	}
+
+	void Jump() {
+		velocity.y = maxJumpVelocity;
 	}
 }

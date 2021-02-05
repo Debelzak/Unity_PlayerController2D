@@ -18,7 +18,6 @@ public class PushableObject : MonoBehaviour {
 		if (controller.collisions.below) {
 			velocity = Vector3.zero;
 		}
-		
 	}
 
 	public Vector2 Push(Vector2 amount) {

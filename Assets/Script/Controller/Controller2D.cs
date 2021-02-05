@@ -3,8 +3,8 @@ using System.Collections;
 
 public class Controller2D : RaycastController {
 	
-	float maxClimbAngle = 80;
-	float maxDescendAngle = 80;
+	public float maxClimbAngle = 60;
+	public float maxDescendAngle = 60;
 	
 	public CollisionInfo collisions;
 	[HideInInspector]
@@ -95,7 +95,10 @@ public class Controller2D : RaycastController {
 				}
 
 				if (!collisions.climbingSlope || slopeAngle > maxClimbAngle) {
-					moveAmount.x = (hit.distance - skinWidth) * directionX;
+
+					//moveAmount.x = (hit.distance - skinWidth) * directionX;
+					moveAmount.x = 0;
+
 					rayLength = hit.distance;
 
 					if (collisions.climbingSlope) {
@@ -121,7 +124,6 @@ public class Controller2D : RaycastController {
 		float rayLength = Mathf.Abs (moveAmount.y) + skinWidth;
 
 		for (int i = 0; i < verticalRayCount; i ++) {
-
 			Vector2 rayOrigin = (directionY == -1)?raycastOrigins.bottomLeft:raycastOrigins.topLeft;
 			rayOrigin += Vector2.right * (verticalRaySpacing * i + moveAmount.x);
 			RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * directionY, rayLength, collisionMask);
@@ -130,6 +132,7 @@ public class Controller2D : RaycastController {
 
 			if (hit) {
 				if (hit.collider.tag == "OneWayPlatform") {
+					collisions.onOneWayPlatform = true;
 					if (directionY == 1 || hit.distance == 0) {
 						continue;
 					}
@@ -221,6 +224,7 @@ public class Controller2D : RaycastController {
 		public float slopeAngle, slopeAngleOld;
 		public Vector2 moveAmountOld;
 		public int faceDir;
+		public bool onOneWayPlatform;
 		public bool fallingThroughPlatform;
 
 		public void Reset() {
@@ -228,10 +232,10 @@ public class Controller2D : RaycastController {
 			left = right = false;
 			climbingSlope = false;
 			descendingSlope = false;
+			onOneWayPlatform = false;
 
 			slopeAngleOld = slopeAngle;
 			slopeAngle = 0;
 		}
 	}
-
 }
