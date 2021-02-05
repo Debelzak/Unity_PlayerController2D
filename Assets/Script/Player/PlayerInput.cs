@@ -3,22 +3,26 @@ using System.Collections;
 
 [RequireComponent (typeof (Player))]
 public class PlayerInput : MonoBehaviour {
-
 	Player player;
+	public Vector2 moveAxis;
+	public bool jumpInput;
+	public bool jumpInputUp;
 
 	void Start () {
 		player = GetComponent<Player> ();
 	}
 
 	void Update () {
-		Vector2 directionalInput = new Vector2 (Input.GetAxisRaw ("Horizontal"), Input.GetAxisRaw ("Vertical"));
-		player.SetDirectionalInput (directionalInput);
+		moveAxis = Vector2.zero;
+		moveAxis = new Vector2 (Input.GetAxisRaw ("Horizontal"), Input.GetAxisRaw ("Vertical"));
+		jumpInput = false;
+		jumpInputUp = false;
 
 		if (Input.GetKeyDown (KeyCode.Space)) {
-			player.OnJumpInputDown ();
+			jumpInput = true;
 		}
 		if (Input.GetKeyUp (KeyCode.Space)) {
-			player.OnJumpInputUp ();
+			jumpInputUp = true;
 		}
 	}
 }

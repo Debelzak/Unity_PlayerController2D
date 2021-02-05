@@ -24,59 +24,61 @@ public class Player : MonoBehaviour {
 	bool canDoubleJump;
 
 	Controller2D controller;
-
-	Vector2 directionalInput;
+	public PlayerInput input;
 
 	void Start() {
 		Physics2D.gravity = new Vector2(0, -28);
-		controller = GetComponent<Controller2D> ();
-
+		controller = GetComponent<Controller2D>();
+		input = GetComponent<PlayerInput>();
 		gravity = -(2 * maxJumpHeight) / Mathf.Pow (timeToJumpApex, 2);
 		maxJumpVelocity = Mathf.Abs(gravity) * timeToJumpApex;
 		minJumpVelocity = Mathf.Sqrt (2 * Mathf.Abs (gravity) * minJumpHeight);
 	}
 
 	void Update() {
+		HandlePlayerInput();
 		CalculateVelocity();
 		CheckGround();
 		HandleWallSliding();
 
-		controller.Move (velocity * Time.deltaTime, directionalInput);
+		controller.Move (velocity * Time.deltaTime, input.moveAxis);
 
 		if (controller.collisions.above || controller.collisions.below) {
 			velocity.y = 0;
 		}
 	}
 
-	public void SetDirectionalInput (Vector2 input) {
-		directionalInput = input;
-	}
+	void HandlePlayerInput() {
+		if(input.jumpInput) {
+			//Platform drop
+			if(input.moveAxis.y == -1 && controller.collisions.oneWayPlatform) {
+				controller.collisions.fallingThroughPlatform = true;
+				return;
+			}
 
-	public void OnJumpInputDown() {
-		if(isWallSliding) {
-			velocity.y = maxJumpVelocity;
-			velocity.x += wallJumpImpulse * -directionalInput.x;
+			//Wall sliding
+			if(isWallSliding) {
+				velocity.y = maxJumpVelocity;
+				velocity.x += wallJumpImpulse * -input.moveAxis.x;
+			}
+
+			//Jump
+			if (canJump) {
+				canJump = false;
+				Jump();
+			}
+
+			//Double jump
+			if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
+				canDoubleJump = false;
+				Jump();
+			}
 		}
 
-		if(directionalInput.y == -1 && controller.collisions.onOneWayPlatform) {
-			return;
-		}
-
-		if (canJump) {
-			canJump = false;
-			Jump();
-		}
-
-		if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
-			canDoubleJump = false;
-			Jump();
-		}
-	}
-
-	public void OnJumpInputUp() 
-	{
-		if (velocity.y > minJumpVelocity) {
-			velocity.y = minJumpVelocity;
+		if(input.jumpInputUp){
+			if (velocity.y > minJumpVelocity) {
+				velocity.y = minJumpVelocity;
+			}
 		}
 	}
 
@@ -108,7 +110,7 @@ public class Player : MonoBehaviour {
 
 	void CalculateVelocity() {
 		velocity.x = 0;
-		velocity.x += directionalInput.x * moveSpeed;
+		velocity.x += input.moveAxis.x * moveSpeed;
 		velocity.y += gravity * Time.deltaTime;
 	}
 

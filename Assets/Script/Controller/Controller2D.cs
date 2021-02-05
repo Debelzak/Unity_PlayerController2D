@@ -8,7 +8,7 @@ public class Controller2D : RaycastController {
 	
 	public CollisionInfo collisions;
 	[HideInInspector]
-	public Vector2 playerInput;
+	public Vector2 attachedInput;
 	
 	public override void Start() {
 		base.Start ();
@@ -25,7 +25,7 @@ public class Controller2D : RaycastController {
 
 		collisions.Reset ();
 		collisions.moveAmountOld = moveAmount;
-		playerInput = input;
+		attachedInput = input;
 
 		if (moveAmount.x != 0) {
 			collisions.faceDir = (int)Mathf.Sign(moveAmount.x);
@@ -44,6 +44,7 @@ public class Controller2D : RaycastController {
 
 		if (standingOnPlatform) {
 			collisions.below = true;
+			collisions.movingPlatform = true;
 		}
 
 		return moveAmount;
@@ -65,7 +66,7 @@ public class Controller2D : RaycastController {
 			rayOrigin += Vector2.up * (horizontalRaySpacing * i);
 			RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.right * directionX, rayLength, collisionMask);
 
-			Debug.DrawRay(rayOrigin, Vector2.right * directionX,Color.red);
+			//Debug.DrawRay(rayOrigin, Vector2.right * directionX,Color.red);
 
 			if (hit) {
 				if (hit.collider.tag == "OneWayPlatform") {
@@ -110,13 +111,6 @@ public class Controller2D : RaycastController {
 				}
 			}
 		}
-
-		if (otherCollider != null && otherCollider.gameObject != this.gameObject && otherCollider.tag == "Pushable") {
-			Vector2	pushAmount = otherCollider.gameObject.GetComponent<PushableObject> ().Push (new Vector2 (originalMoveAmountX, 0));
-			moveAmount = new Vector2 (pushAmount.x, moveAmount.y + pushAmount.y);
-			collisions.left = false;
-			collisions.right = false;
-		}
 	}
 	
 	void VerticalCollisions(ref Vector2 moveAmount) {
@@ -128,19 +122,15 @@ public class Controller2D : RaycastController {
 			rayOrigin += Vector2.right * (verticalRaySpacing * i + moveAmount.x);
 			RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * directionY, rayLength, collisionMask);
 
-			Debug.DrawRay(rayOrigin, Vector2.up * directionY,Color.red);
+			//Debug.DrawRay(rayOrigin, Vector2.up * directionY,Color.red);
 
 			if (hit) {
 				if (hit.collider.tag == "OneWayPlatform") {
-					collisions.onOneWayPlatform = true;
+					collisions.oneWayPlatform = true;
 					if (directionY == 1 || hit.distance == 0) {
 						continue;
 					}
 					if (collisions.fallingThroughPlatform) {
-						continue;
-					}
-					if (playerInput.y == -1 && Input.GetKeyDown(KeyCode.Space) ) {
-						collisions.fallingThroughPlatform = true;
 						Invoke("ResetFallingThroughPlatform",.5f);
 						continue;
 					}
@@ -224,7 +214,8 @@ public class Controller2D : RaycastController {
 		public float slopeAngle, slopeAngleOld;
 		public Vector2 moveAmountOld;
 		public int faceDir;
-		public bool onOneWayPlatform;
+		public bool oneWayPlatform;
+		public bool movingPlatform;
 		public bool fallingThroughPlatform;
 
 		public void Reset() {
@@ -232,7 +223,8 @@ public class Controller2D : RaycastController {
 			left = right = false;
 			climbingSlope = false;
 			descendingSlope = false;
-			onOneWayPlatform = false;
+			oneWayPlatform = false;
+			movingPlatform = false;
 
 			slopeAngleOld = slopeAngle;
 			slopeAngle = 0;
