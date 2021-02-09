@@ -3,9 +3,9 @@ using System.Collections;
 
 [RequireComponent (typeof (Controller2D))]
 public class Player : MonoBehaviour {
-	public float maxJumpHeight = 4;
-	public float minJumpHeight = 1;
-	public float timeToJumpApex = .4f;
+	public float maxJumpHeight;
+	public float minJumpHeight;
+	public float timeToJumpApex;
 	float moveSpeed = 6;
 	public bool enableWallSlide;
 	public bool enableDoubleJump;
@@ -13,7 +13,6 @@ public class Player : MonoBehaviour {
 	public float wallJumpImpulse = 1.0f;
 	bool isWallSliding;
 
-	float gravity;
 	float maxJumpVelocity;
 	float minJumpVelocity;
 	[SerializeField]Vector3 velocity;
@@ -25,12 +24,11 @@ public class Player : MonoBehaviour {
 	public PlayerInput input;
 
 	void Start() {
-		Physics2D.gravity = new Vector2(0, -28);
 		controller = GetComponent<Controller2D>();
 		input = GetComponent<PlayerInput>();
-		gravity = -(2 * maxJumpHeight) / Mathf.Pow (timeToJumpApex, 2);
-		maxJumpVelocity = Mathf.Abs(gravity) * timeToJumpApex;
-		minJumpVelocity = Mathf.Sqrt (2 * Mathf.Abs (gravity) * minJumpHeight);
+		Physics2D.gravity = new Vector2(0, -(2 * maxJumpHeight) / Mathf.Pow (timeToJumpApex, 2));
+		maxJumpVelocity = Mathf.Abs(Physics2D.gravity.y) * timeToJumpApex;
+		minJumpVelocity = Mathf.Sqrt(2 * Mathf.Abs (Physics2D.gravity.y) * minJumpHeight);
 	}
 
 	void Update() {
@@ -72,7 +70,7 @@ public class Player : MonoBehaviour {
 		Vector2 point = new Vector2 (controller.thisCollider.bounds.min.x + (controller.thisCollider.size.x / 2), controller.thisCollider.bounds.min.y);
 		isGrounded = (controller.collisions.below || Physics2D.OverlapCircle(point, 0.4f, controller.collisionMask)) ? true : false;
 
-		canJump = (isGrounded) ? true : false;
+		canJump = (isGrounded && !controller.collisions.above) ? true : false;
 
 		if(isGrounded && velocity.y <= 0) {
 			canDoubleJump = true;
@@ -80,9 +78,8 @@ public class Player : MonoBehaviour {
 	}
 
 	void CalculateVelocity() {
-		velocity.x = 0;
-		velocity.x += input.moveAxis.x * moveSpeed;
-		velocity.y += gravity * Time.deltaTime;
+		velocity.x = input.moveAxis.x * moveSpeed;
+		velocity.y += Physics2D.gravity.y * Time.deltaTime;
 	}
 
 	void Jump() {
