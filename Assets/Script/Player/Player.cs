@@ -6,8 +6,6 @@ public class Player : MonoBehaviour {
 	public float maxJumpHeight = 4;
 	public float minJumpHeight = 1;
 	public float timeToJumpApex = .4f;
-	//float accelerationTimeAirborne = .2f;
-	//float accelerationTimeGrounded = .1f;
 	float moveSpeed = 6;
 	public bool enableWallSlide;
 	public bool enableDoubleJump;
@@ -39,9 +37,8 @@ public class Player : MonoBehaviour {
 		HandlePlayerInput();
 		CalculateVelocity();
 		CheckGround();
-		HandleWallSliding();
 
-		controller.Move (velocity * Time.deltaTime, input.moveAxis);
+		controller.Move(velocity * Time.deltaTime);
 
 		if (controller.collisions.above || controller.collisions.below) {
 			velocity.y = 0;
@@ -50,18 +47,6 @@ public class Player : MonoBehaviour {
 
 	void HandlePlayerInput() {
 		if(input.jumpInput) {
-			//Platform drop
-			if(input.moveAxis.y == -1 && controller.collisions.oneWayPlatform) {
-				controller.collisions.fallingThroughPlatform = true;
-				return;
-			}
-
-			//Wall sliding
-			if(isWallSliding) {
-				velocity.y = maxJumpVelocity;
-				velocity.x += wallJumpImpulse * -input.moveAxis.x;
-			}
-
 			//Jump
 			if (canJump) {
 				canJump = false;
@@ -84,27 +69,13 @@ public class Player : MonoBehaviour {
 
 	void CheckGround()
 	{
-		Vector2 point = new Vector2 (controller.targetCollider.bounds.min.x + (controller.targetCollider.size.x / 2), controller.targetCollider.bounds.min.y);
+		Vector2 point = new Vector2 (controller.thisCollider.bounds.min.x + (controller.thisCollider.size.x / 2), controller.thisCollider.bounds.min.y);
 		isGrounded = (controller.collisions.below || Physics2D.OverlapCircle(point, 0.4f, controller.collisionMask)) ? true : false;
 
 		canJump = (isGrounded) ? true : false;
 
 		if(isGrounded && velocity.y <= 0) {
 			canDoubleJump = true;
-		}
-	}
-
-	void HandleWallSliding() {
-		if(enableWallSlide) {
-			isWallSliding = false;
-			bool canWallSlideNow = ( (controller.collisions.left || controller.collisions.right ) && controller.collisions.slopeAngle == 0) ? true : false;
-			if(canWallSlideNow && !isGrounded && velocity.y < 0) {
-				isWallSliding = true;
-				if(velocity.y != -wallSlideSpeed) {
-					velocity.y = -wallSlideSpeed;
-				}
-				velocity.y = -wallSlideSpeed;
-			}
 		}
 	}
 
