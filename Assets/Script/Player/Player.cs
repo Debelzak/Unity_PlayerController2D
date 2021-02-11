@@ -1,10 +1,13 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 
-[RequireComponent (typeof (Controller2D))]
 public class Player : MonoBehaviour {
 	public float maxJumpHeight;
 	public float minJumpHeight;
+	float accelerationTimeAirborne = .05f;
+	float accelerationTimeGrounded = .0f;
 	public float timeToJumpApex;
 	float moveSpeed = 6;
 	public bool enableWallSlide;
@@ -15,13 +18,18 @@ public class Player : MonoBehaviour {
 
 	float maxJumpVelocity;
 	float minJumpVelocity;
-	[SerializeField]Vector3 velocity;
+	Vector3 velocity;
+	float velocityXSmoothing;
 	bool isGrounded;
 	bool canJump;
 	bool canDoubleJump;
 
+	public GameObject pauseMenuObject;
 	Controller2D controller;
 	public PlayerInput input;
+
+	float deltaTime;
+	float fps;
 
 	void Start() {
 		controller = GetComponent<Controller2D>();
@@ -33,10 +41,19 @@ public class Player : MonoBehaviour {
 
 	void Update() {
 		HandlePlayerInput();
+		RefreshDebugInfo();
+		
+		if(Time.timeScale != 0) {
+			deltaTime += (Time.deltaTime - deltaTime) * 0.1f;
+		}
+		fps = 1.0f / deltaTime;
+	}
+
+	private void FixedUpdate() {
 		CalculateVelocity();
 		CheckGround();
 
-		controller.Move(velocity * Time.deltaTime);
+		controller.Move(velocity * Time.deltaTime, input.moveAxis);
 
 		if (controller.collisions.above || controller.collisions.below) {
 			velocity.y = 0;
@@ -44,33 +61,58 @@ public class Player : MonoBehaviour {
 	}
 
 	void HandlePlayerInput() {
-		if(input.jumpInput) {
-			//Jump
-			if (canJump) {
-				canJump = false;
-				Jump();
+		//Game commands
+		if(input.listenGame) {
+			if(input.jumpInput) {
+				//Platform drop
+				if(controller.collisions.onOneWayPlatform && input.moveAxis.y == -1) {
+					controller.collisions.fallingThroughPlatform = true;
+					return;
+				}
+
+				//Jump
+				if (canJump) {
+					canJump = false;
+					velocity.y = maxJumpVelocity;
+				}
+
+				//Double jump
+				if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
+					canDoubleJump = false;
+					velocity.y = maxJumpVelocity * 0.75f;
+				}
 			}
 
-			//Double jump
-			if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
-				canDoubleJump = false;
-				Jump();
+			if(input.jumpInputUp){
+				if (velocity.y > minJumpVelocity) {
+					velocity.y = minJumpVelocity;
+				}
 			}
 		}
 
-		if(input.jumpInputUp){
-			if (velocity.y > minJumpVelocity) {
-				velocity.y = minJumpVelocity;
+		//Menu commands
+		if(input.listenMenu) {
+			if(input.pauseInput && Time.timeScale > 0) {
+				Time.timeScale = 0;
+				pauseMenuObject.gameObject.SetActive(true);
+				input.listenGame = false;
+				return;
+			}
+
+			if(input.pauseInput && Time.timeScale == 0) {
+				Time.timeScale = 1;
+				pauseMenuObject.gameObject.SetActive(false);
+				input.listenGame = true;
+				return;
 			}
 		}
 	}
 
 	void CheckGround()
 	{
-		Vector2 point = new Vector2 (controller.thisCollider.bounds.min.x + (controller.thisCollider.size.x / 2), controller.thisCollider.bounds.min.y);
-		isGrounded = (controller.collisions.below || Physics2D.OverlapCircle(point, 0.4f, controller.collisionMask)) ? true : false;
+		isGrounded = (controller.collisions.below) ? true : false;
 
-		canJump = (isGrounded && !controller.collisions.above) ? true : false;
+		canJump = (isGrounded) ? true : false;
 
 		if(isGrounded && velocity.y <= 0) {
 			canDoubleJump = true;
@@ -78,11 +120,31 @@ public class Player : MonoBehaviour {
 	}
 
 	void CalculateVelocity() {
-		velocity.x = input.moveAxis.x * moveSpeed;
+		float targetVelocityX = input.moveAxis.x * moveSpeed;
+		velocity.x = Mathf.SmoothDamp (velocity.x, targetVelocityX, ref velocityXSmoothing, (controller.collisions.below)?accelerationTimeGrounded:accelerationTimeAirborne);
 		velocity.y += Physics2D.gravity.y * Time.deltaTime;
 	}
 
-	void Jump() {
-		velocity.y = maxJumpVelocity;
+	void RefreshDebugInfo() {
+		GameObject debugInfo = GameObject.Find("DebugInfo");
+		Text debugInfoTxt = debugInfo.GetComponent<Text>();
+		debugInfoTxt.text = "      Debug Info \n" +
+							"FPS: " + Mathf.Ceil (fps).ToString() + "\n" +
+							"Position: " + "X: " + Math.Round(transform.position.x, 2) + " Y: " + Math.Round(transform.position.y, 2) + "\n" +
+							"Velocity: " + "X: " + Math.Round(velocity.x, 2) + " Y: " + Math.Round(velocity.y, 2) + "\n" +
+							"Can Jump: " + canJump + "\n\n" +
+
+							"      Collisions " + "\n" +
+							"Above: " + controller.collisions.above + "\n" +
+							"Below: " + controller.collisions.below + "\n" +
+							"Left: " + controller.collisions.left + "\n" +
+							"Right: " + controller.collisions.right + "\n" +
+							"On Slope: " + controller.collisions.slope + "\n" +
+
+
+
+
+
+							"";
 	}
 }

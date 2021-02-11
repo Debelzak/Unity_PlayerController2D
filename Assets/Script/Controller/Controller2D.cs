@@ -1,131 +1,173 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class Controller2D : MonoBehaviour {
-	public float skinWidth = 0.15f;
-	public float maxClimbAngle = 60;
-	public float maxDescendAngle = 60;
+public class Controller2D : RaycastController {
 
-	public Rigidbody2D rigidBody;
-	public BoxCollider2D thisCollider;
-	public LayerMask collisionMask;
+	public float maxSlopeAngle = 80;
 
 	public CollisionInfo collisions;
-	
-	void Start() {
-		rigidBody = GetComponent<Rigidbody2D>();
-		thisCollider = GetComponent<BoxCollider2D>();
+	[HideInInspector]
+	public Vector2 playerInput;
+	public Rigidbody2D rb2d;
+
+	public override void Start() {
+		base.Start ();
+		collisions.faceDir = 1;
+		rb2d = GetComponent<Rigidbody2D>();
 	}
 
-	public void Move(Vector2 moveAmount) {
+	public void Move(Vector2 moveAmount, bool standingOnPlatform) {
+		Move (moveAmount, Vector2.zero, standingOnPlatform);
+	}
+
+	public void Move(Vector2 moveAmount, Vector2 input, bool standingOnPlatform = false) {
+		UpdateRaycastOrigins ();
+
 		collisions.Reset ();
+		collisions.moveAmountOld = moveAmount;
+		playerInput = input;
 
-		HandleCollisions (ref moveAmount);
-
-		rigidBody.MovePosition(rigidBody.position + moveAmount);
-	}
-
-	void HandleCollisions(ref Vector2 moveAmount) {
-		if(moveAmount.x != 0) {
-			HorizontalCollisions (ref moveAmount);
+		if (moveAmount.x != 0) {
+			collisions.faceDir = (int)Mathf.Sign(moveAmount.x);
 		}
-		if(moveAmount.y != 0) {
+
+		SlopeCollisions(ref moveAmount);
+		HorizontalCollisions (ref moveAmount);
+		if (moveAmount.y != 0) {
 			VerticalCollisions (ref moveAmount);
 		}
+
+		rb2d.MovePosition (rb2d.position + moveAmount);
+
+		if (standingOnPlatform) {
+			collisions.below = true;
+		}
 	}
-	
-	void VerticalCollisions(ref Vector2 moveAmount) {
-		Vector2 movingDirection = Vector2.zero;
-		movingDirection.x = (moveAmount.x < 0) ? -1 : (moveAmount.x > 0) ? 1 : 0;
-		movingDirection.y = (moveAmount.y < 0) ? -1 : (moveAmount.y > 0) ? 1 : 0;
 
-		float rayLength = skinWidth*2;
+	void HorizontalCollisions(ref Vector2 moveAmount) {
+		float directionX = collisions.faceDir;
+		float rayLength = Mathf.Abs (moveAmount.x) + skinWidth;
 
-		Vector2 rayOrigin = (movingDirection.y == -1) ? new Vector2(thisCollider.bounds.min.x + thisCollider.bounds.size.x/2, thisCollider.bounds.min.y + skinWidth)
-							: new Vector2(thisCollider.bounds.min.x + thisCollider.bounds.size.x/2, thisCollider.bounds.max.y - skinWidth);
+		if (Mathf.Abs(moveAmount.x) < skinWidth) {
+			rayLength = 2*skinWidth;
+		}
 
-		RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * movingDirection.y, rayLength, collisionMask);
+		for (int i = 0; i < horizontalRayCount; i ++) {
+			Vector2 rayOrigin = (directionX == -1)?raycastOrigins.bottomLeft:raycastOrigins.bottomRight;
+			rayOrigin += Vector2.up * (horizontalRaySpacing * i);
+			RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.right * directionX, rayLength, collisionMask);
 
-		Debug.DrawRay(rayOrigin, Vector2.up * movingDirection, Color.red);
+			Debug.DrawRay(rayOrigin, Vector2.right * directionX,Color.red);
 
-		if (hit) {
-			collisions.terrainAngle = Vector2.Angle(Vector2.up, hit.normal);
-
-			if(hit.collider.tag == "OneWayPlatform") {
-				if(movingDirection.y > 0) {
-					return;
+			if (hit) {
+				if(collisions.slope && i == Mathf.Round(horizontalRayCount/4)) {
+					Debug.DrawRay(rayOrigin, Vector2.right * directionX, Color.yellow);
 				}
+				if(collisions.slope && i != Mathf.Round(horizontalRayCount/4) )
+				{
+					continue;
+				}
+				if (hit.collider.tag == "OneWayPlatform") {
+					continue;
+				}
+
+				if (hit.distance == 0) {
+					continue;
+				}
+
+				moveAmount.x = (hit.distance - skinWidth) * directionX;
+				rayLength = hit.distance;
+
+				collisions.left = directionX == -1;
+				collisions.right = directionX == 1;
 			}
+		}
+	}
 
-			moveAmount.y = (hit.distance - skinWidth) * movingDirection.y;
+	void VerticalCollisions(ref Vector2 moveAmount) {
+		float directionY = Mathf.Sign (moveAmount.y);
+		float rayLength = Mathf.Abs (moveAmount.y) + skinWidth;
 
-			collisions.below = movingDirection.y == -1;
-			collisions.above = movingDirection.y == 1;
+		for (int i = 0; i < verticalRayCount; i ++) {
 
-			if(collisions.terrainAngle != 0) {
-				Vector2 rayTopOrigin = new Vector2(thisCollider.bounds.min.x + thisCollider.bounds.size.x/2, thisCollider.bounds.max.y - skinWidth);
-				RaycastHit2D hitTop = Physics2D.Raycast(rayTopOrigin, Vector2.up, rayLength, collisionMask);
+			Vector2 rayOrigin = (directionY == -1)?raycastOrigins.bottomLeft:raycastOrigins.topLeft;
+			rayOrigin += Vector2.right * (verticalRaySpacing * i + moveAmount.x);
+			RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * directionY, rayLength, collisionMask);
 
-				if(hitTop) {
-					collisions.above = true;
+			Debug.DrawRay(rayOrigin, Vector2.up * directionY,Color.red);
 
-					collisions.left = hit.normal.x > 0;
-					collisions.right = hit.normal.x < 0;
-
-					if( (collisions.right && moveAmount.x > 0) || (collisions.left && moveAmount.x < 0)) {
-						moveAmount = Vector2.zero;
+			if (hit) {
+				if (hit.collider.tag == "OneWayPlatform") {
+					collisions.onOneWayPlatform = true;
+					if (directionY == 1 || hit.distance == 0) {
+						continue;
+					}
+					if (collisions.fallingThroughPlatform) {
+						Invoke("ResetFallingThroughPlatform",.25f);
+						continue;
 					}
 				}
+				if(collisions.slope && i != Mathf.Round(verticalRayCount/2))
+				{
+					continue;
+				}
+
+				moveAmount.y = (hit.distance - skinWidth) * directionY;
+				rayLength = hit.distance;
+
+				collisions.below = directionY == -1;
+				collisions.above = directionY == 1;
 			}
 		}
 	}
 
-	void HorizontalCollisions (ref Vector2 moveAmount) {
-		Vector2 movingDirection = Vector2.zero;
-		movingDirection.x = (moveAmount.x < 0) ? -1 : (moveAmount.x > 0) ? 1 : 0;
-		movingDirection.y = (moveAmount.y < 0) ? -1 : (moveAmount.y > 0) ? 1 : 0;
+	void SlopeCollisions(ref Vector2 moveAmount) {
+		float directionY = Mathf.Sign (moveAmount.y);
+		Vector2 rayOrigin = new Vector2(thisCollider.bounds.min.x + thisCollider.bounds.size.x/2, thisCollider.bounds.min.y + thisCollider.bounds.size.y/2);
 
-		float rayLength = skinWidth * 2;
+		float tempSkinWidth = skinWidth;
 
-		Vector2 rayOrigin = (movingDirection.x < 0) ? new Vector2(thisCollider.bounds.min.x + skinWidth, thisCollider.bounds.min.y + thisCollider.bounds.size.y/2)
-							: new Vector2(thisCollider.bounds.max.x - skinWidth, thisCollider.bounds.min.y + thisCollider.bounds.size.y/2);
-		RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.right * movingDirection.x, rayLength, collisionMask);
-
-		Debug.DrawRay(rayOrigin, Vector2.right * movingDirection, Color.red);
-
-		if(hit) {
-			if(Mathf.Abs(hit.normal.x) != 1) {
-				return;
-			}
-			if(hit.collider.tag == "OneWayPlatform") {
-				return;
-			}
-
-			moveAmount.x = (hit.distance - skinWidth) * movingDirection.x;
-			collisions.right = movingDirection.x == -1;
-			collisions.left = movingDirection.x == 1;
+		if(Mathf.Abs(moveAmount.y) < skinWidth) {
+			tempSkinWidth = 0.5f;
 		}
 
-		if(collisions.left && movingDirection.x < 0) {
-			moveAmount.x = 0;
-		}
+		print(Mathf.Abs (moveAmount.y));
 
-		if(collisions.right && movingDirection.x > 0) {
-			moveAmount.x = 0;
-		}
+		float rayLength = thisCollider.bounds.size.y/2 + tempSkinWidth;
 
+		RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * directionY, rayLength, slopeCollisionMask);
+
+		if(hit && !collisions.right && !collisions.left && !collisions.above) {
+			Debug.DrawLine(rayOrigin, hit.point, Color.yellow);
+
+			moveAmount = Vector2.Perpendicular(hit.normal) * -moveAmount.x;
+			moveAmount.y -= (hit.distance - thisCollider.bounds.size.y/2);
+		
+			collisions.slope = true;
+			collisions.above = directionY == 1;
+			collisions.below = directionY == -1;
+		}
+	}
+
+	void ResetFallingThroughPlatform() {
+		collisions.fallingThroughPlatform = false;
 	}
 
 	public struct CollisionInfo {
 		public bool above, below;
 		public bool left, right;
-		public float terrainAngle;
-		public float wallAngle;
+		public bool slope;
+
+		public Vector2 moveAmountOld;
+		public int faceDir;
+		public bool onOneWayPlatform, fallingThroughPlatform;
 
 		public void Reset() {
 			above = below = false;
 			left = right = false;
-			terrainAngle = 0;
+			slope = false;
+			onOneWayPlatform = false;
 		}
 	}
+
 }
