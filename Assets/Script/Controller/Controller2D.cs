@@ -16,32 +16,23 @@ public class Controller2D : RaycastController {
 		rb2d = GetComponent<Rigidbody2D>();
 	}
 
-	public void Move(Vector2 moveAmount, bool standingOnPlatform) {
-		Move (moveAmount, Vector2.zero, standingOnPlatform);
-	}
-
-	public void Move(Vector2 moveAmount, Vector2 input, bool standingOnPlatform = false) {
+	public void Move(Vector2 moveAmount) {
 		UpdateRaycastOrigins ();
 
 		collisions.Reset ();
 		collisions.moveAmountOld = moveAmount;
-		playerInput = input;
 
 		if (moveAmount.x != 0) {
 			collisions.faceDir = (int)Mathf.Sign(moveAmount.x);
 		}
 
-		SlopeCollisions(ref moveAmount);
 		HorizontalCollisions (ref moveAmount);
+		SlopeCollisions(ref moveAmount);
 		if (moveAmount.y != 0) {
 			VerticalCollisions (ref moveAmount);
 		}
 
 		rb2d.MovePosition (rb2d.position + moveAmount);
-
-		if (standingOnPlatform) {
-			collisions.below = true;
-		}
 	}
 
 	void HorizontalCollisions(ref Vector2 moveAmount) {
@@ -115,35 +106,43 @@ public class Controller2D : RaycastController {
 				moveAmount.y = (hit.distance - skinWidth) * directionY;
 				rayLength = hit.distance;
 
-				collisions.below = directionY == -1;
-				collisions.above = directionY == 1;
+				if(directionY == -1)
+				collisions.below = true;
+				if(directionY == 1)
+				collisions.above = true;
 			}
 		}
 	}
 
 	void SlopeCollisions(ref Vector2 moveAmount) {
+		collisions.slope = false;
 		float directionY = Mathf.Sign (moveAmount.y);
+
 		Vector2 rayOrigin = new Vector2(thisCollider.bounds.min.x + thisCollider.bounds.size.x/2, thisCollider.bounds.min.y + thisCollider.bounds.size.y/2);
 
-		float tempSkinWidth = skinWidth;
+		float tempSkinWidth = Mathf.Abs(moveAmount.y);
 
 		if(Mathf.Abs(moveAmount.y) < skinWidth) {
 			tempSkinWidth = 0.5f;
 		}
 
-		print(Mathf.Abs (moveAmount.y));
-
 		float rayLength = thisCollider.bounds.size.y/2 + tempSkinWidth;
 
 		RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.up * directionY, rayLength, slopeCollisionMask);
 
-		if(hit && !collisions.right && !collisions.left && !collisions.above) {
+		if(hit) {
 			Debug.DrawLine(rayOrigin, hit.point, Color.yellow);
 
-			moveAmount = Vector2.Perpendicular(hit.normal) * -moveAmount.x;
-			moveAmount.y -= (hit.distance - thisCollider.bounds.size.y/2);
-		
-			collisions.slope = true;
+			if(directionY < 0) {
+				moveAmount = Vector2.Perpendicular(hit.normal) * -moveAmount.x;
+
+				collisions.slope = true;
+				collisions.slopeClimbing = (moveAmount.y > 0) ? true : false;
+				collisions.slopeDescending = (moveAmount.y < 0) ? true : false;
+			}
+
+			moveAmount.y += (hit.distance - thisCollider.bounds.size.y/2) * directionY;
+
 			collisions.above = directionY == 1;
 			collisions.below = directionY == -1;
 		}
@@ -157,6 +156,8 @@ public class Controller2D : RaycastController {
 		public bool above, below;
 		public bool left, right;
 		public bool slope;
+		public bool slopeClimbing;
+		public bool slopeDescending;
 
 		public Vector2 moveAmountOld;
 		public int faceDir;
@@ -165,8 +166,9 @@ public class Controller2D : RaycastController {
 		public void Reset() {
 			above = below = false;
 			left = right = false;
-			slope = false;
 			onOneWayPlatform = false;
+			slopeClimbing = false;
+			slopeDescending = false;
 		}
 	}
 

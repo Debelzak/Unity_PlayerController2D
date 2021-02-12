@@ -25,13 +25,13 @@ public class PlayerInput : MonoBehaviour {
 		jumpInputUp = false;
 		pauseInput = false;
 
-		if (Input.GetKeyDown (KeyCode.Space)) {
+		if (Input.GetKeyDown (KeyCode.Space) || Input.GetButtonDown("Jump")) {
 			jumpInput = true;
 		}
-		if (Input.GetKeyUp (KeyCode.Space)) {
+		if (Input.GetKeyUp (KeyCode.Space) || Input.GetButtonUp("Jump")) {
 			jumpInputUp = true;
 		}
-		if (Input.GetKeyDown (KeyCode.Escape)) {
+		if (Input.GetKeyDown (KeyCode.Escape) || Input.GetButtonDown("Cancel")) {
 			pauseInput = true;
 		}
 	}

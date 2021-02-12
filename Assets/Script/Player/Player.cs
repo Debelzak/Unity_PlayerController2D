@@ -4,18 +4,28 @@ using UnityEngine.UI;
 using System.Collections;
 
 public class Player : MonoBehaviour {
-	public float maxJumpHeight;
+	[Header("Movement")]
+	public float moveSpeed = 6;
+	public float accelerationTimeAirborne = .05f;
+	public float accelerationTimeGrounded = .0f;
+	[Range(1, 100)] public float climbSlopeSpeed = 100;
+	[Range(100, 200)] public float descendSlopeSpeed = 100;
+
+	[Header("Jump")]
 	public float minJumpHeight;
-	float accelerationTimeAirborne = .05f;
-	float accelerationTimeGrounded = .0f;
-	public float timeToJumpApex;
-	float moveSpeed = 6;
-	public bool enableWallSlide;
+	public float maxJumpHeight;
+	public float timeToJumpApex = 1;
+
+	[Header("Double Jump")]
 	public bool enableDoubleJump;
+	[Range(1, 100)] public int doubleJumpSpeed = 100;
+
+	[Header("Wall slide")]
+	public bool enableWallSlide;
 	public float wallSlideSpeed = 0.5f;
 	public float wallJumpImpulse = 1.0f;
-	bool isWallSliding;
 
+	bool isWallSliding;
 	float maxJumpVelocity;
 	float minJumpVelocity;
 	Vector3 velocity;
@@ -53,7 +63,7 @@ public class Player : MonoBehaviour {
 		CalculateVelocity();
 		CheckGround();
 
-		controller.Move(velocity * Time.deltaTime, input.moveAxis);
+		controller.Move(velocity * Time.deltaTime);
 
 		if (controller.collisions.above || controller.collisions.below) {
 			velocity.y = 0;
@@ -79,10 +89,10 @@ public class Player : MonoBehaviour {
 				//Double jump
 				if(enableDoubleJump && canDoubleJump && !isGrounded && !canJump) {
 					canDoubleJump = false;
-					velocity.y = maxJumpVelocity * 0.75f;
+					velocity.y = maxJumpVelocity * ( (float)doubleJumpSpeed / 100);
 				}
 			}
-
+			//Jump cancel
 			if(input.jumpInputUp){
 				if (velocity.y > minJumpVelocity) {
 					velocity.y = minJumpVelocity;
@@ -122,6 +132,17 @@ public class Player : MonoBehaviour {
 	void CalculateVelocity() {
 		float targetVelocityX = input.moveAxis.x * moveSpeed;
 		velocity.x = Mathf.SmoothDamp (velocity.x, targetVelocityX, ref velocityXSmoothing, (controller.collisions.below)?accelerationTimeGrounded:accelerationTimeAirborne);
+
+		//velocity climbing slope
+		if(controller.collisions.slopeClimbing) {
+			velocity.x *= (float)climbSlopeSpeed / 100;
+		}
+
+		//velocity descending slope
+		if(controller.collisions.slopeDescending) {
+			velocity.x *= (float)descendSlopeSpeed / 100;
+		}
+
 		velocity.y += Physics2D.gravity.y * Time.deltaTime;
 	}
 
@@ -130,20 +151,26 @@ public class Player : MonoBehaviour {
 		Text debugInfoTxt = debugInfo.GetComponent<Text>();
 		debugInfoTxt.text = "      Debug Info \n" +
 							"FPS: " + Mathf.Ceil (fps).ToString() + "\n" +
-							"Position: " + "X: " + Math.Round(transform.position.x, 2) + " Y: " + Math.Round(transform.position.y, 2) + "\n" +
-							"Velocity: " + "X: " + Math.Round(velocity.x, 2) + " Y: " + Math.Round(velocity.y, 2) + "\n" +
-							"Can Jump: " + canJump + "\n\n" +
-
+							"Position: " + "\n" +
+							"- X " + Math.Round((double)transform.position.x, 2) + "\n" +
+							"- Y " + Math.Round((double)transform.position.y, 2) + "\n" +
+							"Velocity: " + "\n" +
+							"- X " + Math.Round((double)velocity.x, 2) + "\n" +
+							"- Y " + Math.Round((double)velocity.y, 2) + "\n" +
+							"\n" +
 							"      Collisions " + "\n" +
 							"Above: " + controller.collisions.above + "\n" +
 							"Below: " + controller.collisions.below + "\n" +
 							"Left: " + controller.collisions.left + "\n" +
 							"Right: " + controller.collisions.right + "\n" +
+							"One Way Platform: " + controller.collisions.onOneWayPlatform + "\n" +
 							"On Slope: " + controller.collisions.slope + "\n" +
-
-
-
-
+							" - Climbing: " + controller.collisions.slopeClimbing + "\n" +
+							" - Descending: " + controller.collisions.slopeDescending + "\n" +
+							"\n" +
+							"      Features " + "\n" +
+							"Double Jump: " + enableDoubleJump + "\n" +
+							"Wall Slide: " + enableWallSlide + "\n" +
 
 							"";
 	}
